@@ -135,7 +135,9 @@ namespace DataEntityGenerator.ViewModels.FileSelector
                 return;
             }
 
-            _fileGeneratorFactory.GetFileGenerator(codeType.Kind, Items).Generate(path, codeType);
+            var generator = _fileGeneratorFactory.GetFileGenerator(codeType.Kind, Items);
+            generator.Generate(path, codeType);
+            generator.GenerateChildren(path);
         }
 
         private CodeType GetMainType(CodeElement[] codeElements)

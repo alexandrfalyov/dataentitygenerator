@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using DataEntityGenerator.Helpers;
 using EnvDTE;
+using EnvDTE80;
 
 namespace DataEntityGenerator.Generators
 {
@@ -34,9 +36,9 @@ namespace DataEntityGenerator.Generators
             sb.Append("}");
         }
 
-        private CodeVariable[] GetEnumFields(CodeEnum codeEnum)
+        private CodeVariable2[] GetEnumFields(CodeEnum codeEnum)
         {
-            return codeEnum.Members.Cast<CodeElement>().Where(x => x.Kind == vsCMElement.vsCMElementVariable).Cast<CodeVariable>().ToArray();
+            return codeEnum.Members.Cast<CodeElement>().Where(x => x.Kind == vsCMElement.vsCMElementVariable).Cast<CodeVariable2>().ToArray();
         }
     }
 }

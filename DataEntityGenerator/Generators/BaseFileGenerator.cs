@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using DataEntityGenerator.Helpers;
+using DataEntityGenerator.Models;
 using EnvDTE;
 using EnvDTE80;
 
@@ -35,7 +36,7 @@ namespace DataEntityGenerator.Generators
                                                                                    { "System.Boolean", "boolean" }
                                                                                };
 
-        private static readonly Dictionary<string, string> ArrayGenericTypeMapping = new Dictionary<string, string>()
+        private static readonly Dictionary<string, string> ArrayGenericTypeMapping = new Dictionary<string, string>
                                                                                      {
                                                                                          { "System.Collections.Generic.List", "Array" },
                                                                                          { "System.Collections.Generic.IEnumerable", "Array" },
@@ -47,6 +48,28 @@ namespace DataEntityGenerator.Generators
         {
             _projectItems = projectItems;
             _factory = factory;
+            DependencyCodeTypes = new Dictionary<string, EntityCodeType>();
+        }
+
+        public Dictionary<string, EntityCodeType> DependencyCodeTypes { get; }
+
+        public void GenerateChildren(string path)
+        {
+            foreach (var dependencyCodeType in DependencyCodeTypes.Values)
+            {
+                var codeType = dependencyCodeType.Type;
+                var generator = _factory.GetFileGenerator(codeType.Kind, _projectItems);
+                generator.Generate(path, codeType);
+                generator.GenerateChildren(path);
+            }
+        }
+
+        public void Merge(Dictionary<string, EntityCodeType> dependencyCodeTypes)
+        {
+            foreach (var dependencyCodeType in dependencyCodeTypes)
+            {
+                DependencyCodeTypes[dependencyCodeType.Key] = dependencyCodeType.Value;
+            }
         }
 
         public void Generate(string path, CodeType codeType)
@@ -54,6 +77,13 @@ namespace DataEntityGenerator.Generators
             var sb = new StringBuilder();
             var name = codeType.Name.ToCamelCase();
             Render(sb, codeType, path, name);
+
+            foreach (var dependencyCodeType in DependencyCodeTypes)
+            {
+                var childName = dependencyCodeType.Value.Type.Name.ToCamelCase();
+                sb.Insert(0, $"import {{ {childName} }} from './{childName}'\r\n");
+            }
+
             using (var file = File.Open(Path.Combine(path, $"{name}.ts"), FileMode.Create,
                                         FileAccess.ReadWrite,
                                         FileShare.Read))
@@ -148,7 +178,7 @@ namespace DataEntityGenerator.Generators
                     {
                         var typeCode = FindCodeTypeByFullName($"{codeImport}.{value}");
                         if (typeCode == null) continue;
-                        _factory.GetFileGenerator(typeCode.Kind, _projectItems).Generate(path, typeCode);
+                        DependencyCodeTypes[typeCode.FullName] = new EntityCodeType { Type = typeCode };
                         return "any";
                     }
                 }
@@ -157,10 +187,8 @@ namespace DataEntityGenerator.Generators
             var childCodeType = FindCodeTypeByFullName(fullName);
             if (childCodeType != null)
             {
-                var name = childCodeType.Name.ToCamelCase();
-                _factory.GetFileGenerator(childCodeType.Kind, _projectItems).Generate(path, childCodeType);
-                sb.Insert(0, $"import {{ {name} }} from './{name}'\r\n");
-                return name;
+                DependencyCodeTypes[childCodeType.FullName] = new EntityCodeType { Type = childCodeType, IsNeedImport = true };
+                return childCodeType.Name.ToCamelCase();
             }
 
             return string.Empty;
